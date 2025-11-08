@@ -45,6 +45,8 @@ txt_base = [
     "Argamasilla de Alba, tu pueblo. Sus solitarias calles y piedras están mudas ante "
     "ti. ¿Qué dirá este bando que hay en un muro? Hay una calle hacia el oeste y otra "
     "hacia el sur."   
+
+# Habitación 9
 ]
 
 img = [
