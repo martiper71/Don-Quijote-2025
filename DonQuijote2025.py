@@ -845,6 +845,60 @@ entrada = tk.Entry(
 entrada.pack(fill=tk.BOTH, expand=True)
 
 
+def mostrar_pantalla_inicio():
+    """
+    Muestra la pantalla inicial con la imagen 000 y espera cualquier tecla
+    para comenzar el juego.
+    """
+    # Cargar imagen 000 (portada)
+    foto_portada = cargar_imagen_segura(img[0]) if len(img) > 0 else None
+    if foto_portada:
+        imagen.config(image=foto_portada, text="")
+        imagen.foto_actual = foto_portada
+    else:
+        imagen.config(image="", text="[Portada no disponible]", fg="white", font=("Verdana", 14))
+
+    # Mensaje de inicio (más arriba)
+    texto.config(text="Pulsa una tecla para empezar")
+
+    # Reubicar el texto más arriba y ocultar temporalmente la entrada
+    try:
+        texto.pack_forget()
+    except Exception:
+        pass
+    texto.pack(fill=tk.X, expand=False, pady=(10, 0))
+    try:
+        entrada.pack_forget()
+    except Exception:
+        pass
+
+    # Desactivar la entrada mientras esperamos la tecla
+    entrada.config(state="disabled")
+    entrada.delete(0, tk.END)
+
+    # Capturar cualquier tecla para iniciar el juego
+    fondo.bind("<Key>", manejar_tecla_inicio)
+
+
+def manejar_tecla_inicio(event):
+    """
+    Inicia el juego al pulsar cualquier tecla en la pantalla inicial.
+    """
+    fondo.unbind("<Key>")
+    entrada.config(state="normal")
+    # Restaurar disposición normal del texto y volver a mostrar la entrada
+    try:
+        texto.pack_forget()
+    except Exception:
+        pass
+    texto.pack(fill=tk.BOTH, expand=True)
+    entrada.pack(fill=tk.BOTH, expand=True)
+    refrescar_pantalla(habitacion_actual, descripcion_con_objetos(habitacion_actual), None)
+    entrada.delete(0, tk.END)
+    entrada.insert(0, ">> ")
+    entrada.focus_set()
+
+
 def mostrar_pantalla_muerte(mensaje):
     """
     Muestra el mensaje de muerte y espera una tecla para reiniciar la partida.
@@ -954,10 +1008,10 @@ def motor_juego(event):
 # 6. INICIO DEL JUEGO
 # ---------------------------
 
-# Dejamos el prompt listo, enfocamos la entrada y conectamos la tecla Enter
-# con el motor principal. Finalmente iniciamos el bucle de eventos de Tkinter.
-entrada.insert(0, ">> ")
-entrada.focus_set()
+# Conectamos la tecla Enter con el motor principal.
 entrada.bind("<Return>", motor_juego)
+
+# Mostramos la pantalla de inicio (portada) y esperamos una tecla para empezar.
+mostrar_pantalla_inicio()
 
 fondo.mainloop()
