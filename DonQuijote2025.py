@@ -23,8 +23,8 @@ txt_base = [
     "Puedes subir, ir al norte, sur y este.",
 
 # Habitación 4
-    "En la antigua y acogedora cocina desnuda de todo lo que pueda recordar olorosas "
-    "comidas queda una triste alacena. Hay una puerta hacia el sur y otra hacía el "
+    "En la antigua y acogedora cocina desnuda de todo desnuda de todo lo que pueda recordar"
+    "olorosas comidas queda una triste alacena. Hay una puerta hacia el sur y otra hacía el "
     "norte.",
 
 # Habitación 5
@@ -67,7 +67,9 @@ img = [
 # cond[3] controla si ya has descubierto la armadura en el baúl (hab 5)
 # cond[4] indica si la alacena (hab 4) está abierta
 # cond[5] indica si la llave de la alacena ya ha sido descubierta mediante 'examinar alacena'
+# cond[6] indica si la puerta del portalón (hab 7) ha sido abierta mediante 'abrir puerta'
 cond = ["", 
+        "n",
         "n",
         "n",
         "n",
@@ -125,7 +127,7 @@ def restablecer_estado_inicial():
     global habitacion_actual, cond, inventario, objetos_en_sala
 
     habitacion_actual = 1  # dormitorio
-    cond = ["", "n", "n", "n", "n", "n"]
+    cond = ["", "n", "n", "n", "n", "n", "n"]
     inventario = ["camisa"]
     objetos_en_sala = clonar_objetos_iniciales()
 
@@ -554,14 +556,27 @@ def ejecutar_comando(verbo, objeto):
         if nombre_normalizado != "armadura":
             return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No parece que puedas ponerte eso."
 
-        if "armadura" not in inventario:
-            return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No llevas esa armadura contigo."
-
         if cond[2] == "s":
             return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Ya llevas puesta la armadura."
 
-        cond[2] = "s"
-        return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Te colocas la armadura y te sientes protegido."
+        # NUEVO: permitir ponérsela si está en el inventario O si está visible en la sala actual
+        if ("armadura" in inventario) or ("armadura" in objetos_visibles_en_sala(hab)):
+            # Si está en el inventario, la quitamos (la estamos vistiendo).
+            if "armadura" in inventario:
+                inventario.remove("armadura")
+            # Si está en la sala, la quitamos de la lista de objetos de la sala.
+            sala_objs = objetos_en_sala.get(hab, [])
+            if "armadura" in sala_objs:
+                try:
+                    sala_objs.remove("armadura")
+                except ValueError:
+                    pass
+
+            cond[2] = "s"
+            return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Te pones la armadura."
+
+        # Si no está disponible ni en inventario ni en sala
+        return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No llevas esa armadura contigo."
 
     # COGER OBJETO
     if verbo in ["coger", "agarrar", "tomar"]:
@@ -614,6 +629,16 @@ def ejecutar_comando(verbo, objeto):
             return habitacion_actual, descripcion_con_objetos(habitacion_actual), "¿Abrir qué?"
 
         objetivo = objeto.strip().lower()
+
+        # Nueva lógica: abrir la puerta del portalón en la habitación 7
+        if hab == 7 and "puerta" in objetivo:
+            if cond[6] == "s":
+                return habitacion_actual, descripcion_con_objetos(habitacion_actual), "La puerta ya está abierta."
+            if "llave" in inventario:
+                cond[6] = "s"
+                return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Abres la puerta con la llave. Ahora puedes ir al oeste."
+            else:
+                return habitacion_actual, descripcion_con_objetos(habitacion_actual), "La puerta está cerrada. Necesitas una llave."
 
         if hab == 4 and objetivo in ["alacena", "la alacena"]:
             if cond[2] == "s":
@@ -696,16 +721,19 @@ def ejecutar_comando(verbo, objeto):
                 return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No puedes ir en esa dirección."       
 
         elif hab == 7:
-            # Portalón: oeste al zaguán, este hacia el exterior condicionado por el libro.
+            # Portalón: este vuelve al zaguán (hab 3), oeste hacia la plaza (hab 8) requiere llave y haber abierto la puerta
             if direccion == "o":
                 habitacion_actual = 3
                 return habitacion_actual, descripcion_con_objetos(habitacion_actual), None
             elif direccion == "e":
-                if cond[1] == "s":
-                    habitacion_actual = 2
+                # Solo permitir paso al oeste si la puerta está abierta y tienes la llave en inventario
+                if cond[6] == "s" and "llave" in inventario:
+                    habitacion_actual = 8
                     return habitacion_actual, descripcion_con_objetos(habitacion_actual), None
+                elif cond[6] != "s":
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), "La puerta está cerrada. Quizá puedas abrirla con una llave."
                 else:
-                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No puedes ir hasta que empiece la aventura."
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No puedes abrir la puerta: no llevas la llave."
             else:
                 return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No puedes ir en esa dirección."       
                  
