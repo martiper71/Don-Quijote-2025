@@ -68,7 +68,9 @@ img = [
 # cond[4] indica si la alacena (hab 4) está abierta
 # cond[5] indica si la llave de la alacena ya ha sido descubierta mediante 'examinar alacena'
 # cond[6] indica si la puerta del portalón (hab 7) ha sido abierta mediante 'abrir puerta'
+# cond[7] controla si ya se examinó la pared en la habitación 6 (espada revelada)
 cond = ["", 
+        "n",
         "n",
         "n",
         "n",
@@ -127,7 +129,7 @@ def restablecer_estado_inicial():
     global habitacion_actual, cond, inventario, objetos_en_sala
 
     habitacion_actual = 1  # dormitorio
-    cond = ["", "n", "n", "n", "n", "n", "n"]
+    cond = ["", "n", "n", "n", "n", "n", "n", "n"]
     inventario = ["camisa"]
     objetos_en_sala = clonar_objetos_iniciales()
 
@@ -148,6 +150,10 @@ def objetos_visibles_en_sala(hab):
     # (es decir, si has examinado la alacena con la alacena abierta).
     if hab == 4 and "llave" in visibles and cond[5] != "s":
         visibles.remove("llave")
+
+    # En la habitación 6, la espada permanece oculta hasta examinar la pared.
+    if hab == 6 and "espada" in visibles and cond[7] != "s":
+        visibles.remove("espada")
 
     return visibles
 
@@ -471,6 +477,24 @@ def ejecutar_comando(verbo, objeto):
     if verbo in ["examinar", "mirar"]:
         if objeto:
             texto_objeto = objeto.strip().lower()
+
+            # Habitación 6: examinar pared para revelar la espada
+            if hab == 6:
+                texto_sin_tildes = (
+                    texto_objeto.replace("ǭ", "a")
+                    .replace("Ǹ", "e")
+                    .replace("��", "i")
+                    .replace("��", "o")
+                    .replace("ǧ", "u")
+                )
+                if "pared" in texto_sin_tildes:
+                    if cond[7] != "s":
+                        cond[7] = "s"
+                        mensaje = "Una espada y un escudo cuelgan de la pared."
+                        return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
+                    else:
+                        mensaje = "Un escudo cuelga de la pared."
+                        return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
 
             if hab == 5:
                 texto_sin_tildes = (
