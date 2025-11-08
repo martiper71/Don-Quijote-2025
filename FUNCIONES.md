@@ -1,0 +1,23 @@
+# Lista de funciones del programa
+
+- `clonar_objetos_iniciales()` — Devuelve copia del estado inicial de objetos.
+- `restablecer_estado_inicial()` — Reinicia habitación, condicionales, inventario y objetos en salas.
+- `objetos_visibles_en_sala(hab)` — Lista objetos visibles en una sala (aplica condicionales).
+- `lista_a_texto_natural(lista)` — Formatea listas en texto natural en castellano.
+- `articulo_objeto(nombre)` — Devuelve artículo/frase corta para listar objetos en sala.
+- `nombre_visible_inventario(nombre)` — Nombre legible del objeto para inventario/mensajes.
+- `normaliza_objeto_usuario(texto_objeto)` — Normaliza entradas de usuario a nombres internos.
+- `descripcion_objeto(nombre, origen)` — Descripción de objeto según origen ('sala' o 'inventario').
+- `inventario_texto()` — Texto mostrado al consultar el inventario.
+- `descripcion_con_objetos(hab)` — Descripción dinámica de la sala incluyendo objetos visibles.
+- `normaliza_direccion(palabra)` — Normaliza palabras de dirección a códigos internos.
+- `parsear(frase_usuario)` — Convierte la frase del jugador en (verbo, objeto).
+- `ejecutar_comando(verbo, objeto)` — Motor principal; devuelve (nueva_hab, descripcion_sala, mensaje_extra).
+  - Función interna: `morir_por_rata()` — Maneja la secuencia de muerte por la rata.
+- `cargar_imagen_segura(ruta)` — Carga PhotoImage intentando rutas relativas y absolutas.
+- `mostrar_pantalla_muerte(mensaje)` — Muestra pantalla de muerte y desactiva entrada.
+- `manejar_tecla_reinicio(event)` — Reinicia la partida al pulsar una tecla tras morir.
+- `refrescar_pantalla(nueva_hab, descripcion_sala, mensaje_extra=None)` — Actualiza imagen y texto de la interfaz.
+- `cerrar_juego_despues(mensaje_final)` — Muestra mensaje final y cierra la ventana tras retardo.
+- `limpiar_prompt(contenido)` — Elimina el prompt ">>" y limpia la entrada del jugador.
+- `motor_juego(event)` — Handler principal ligado al Enter: lee entrada, parsea, ejecuta comando y actualiza UI.

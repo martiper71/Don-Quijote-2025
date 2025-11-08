@@ -63,15 +63,13 @@ img = [
 
 # Vector de banderas de estado globales.
 # cond[1] controla si puedes ir al sur desde la habitación 1
-# (antes hay que leer el libro).
-# cond[2] indica si llevas la armadura puesta y, por tanto, si
-# puedes abrir la alacena sin morir.
-# cond[3] controla si ya has descubierto la armadura oculta en el
-# baúl de la habitación 5.
-# Otros huecos se reservan para futuros obstáculos.
-# "n" = aún no puedes pasar.
-# "s" = el obstáculo ya está desbloqueado.
+# cond[2] indica si llevas la armadura puesta
+# cond[3] controla si ya has descubierto la armadura en el baúl (hab 5)
+# cond[4] indica si la alacena (hab 4) está abierta
+# cond[5] indica si la llave de la alacena ya ha sido descubierta mediante 'examinar alacena'
 cond = ["", 
+        "n",
+        "n",
         "n",
         "n",
         "n"
@@ -127,7 +125,7 @@ def restablecer_estado_inicial():
     global habitacion_actual, cond, inventario, objetos_en_sala
 
     habitacion_actual = 1  # dormitorio
-    cond = ["", "n", "n", "n"]
+    cond = ["", "n", "n", "n", "n", "n"]
     inventario = ["camisa"]
     objetos_en_sala = clonar_objetos_iniciales()
 
@@ -143,6 +141,11 @@ def objetos_visibles_en_sala(hab):
 
     if hab == 5 and cond[3] != "s" and "armadura" in visibles:
         visibles.remove("armadura")
+    
+    # La llave de la habitación 4 sólo es visible si ya la has descubierto
+    # (es decir, si has examinado la alacena con la alacena abierta).
+    if hab == 4 and "llave" in visibles and cond[5] != "s":
+        visibles.remove("llave")
 
     return visibles
 
@@ -480,8 +483,23 @@ def ejecutar_comando(verbo, objeto):
                     mensaje = "Entre las muchas anticuallas destaca una armadura."
                     return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
 
-            # Caso especial: "mirar libro" en la hab 1, pero ahora el libro es ya objeto real,
-            # así que tratamos como cualquier objeto normal usando normalización.
+            # Nuevo: examinar la alacena en la habitación 4
+            texto_sin_tildes = (
+                texto_objeto.replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+            )
+            if hab == 4 and ("alacena" in texto_sin_tildes or "la alacena" in texto_sin_tildes):
+                if cond[4] == "s":
+                    # alacena ya está abierta -> al examinar aparece la llave
+                    cond[5] = "s"  # marca que la llave está descubierta/visible
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Hay una llave."
+                else:
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), "La alacena está cerrada."
+
+            # Caso general existente para mirar objetos...
             nombre_normalizado = normaliza_objeto_usuario(objeto)
 
             if nombre_normalizado:
@@ -599,7 +617,9 @@ def ejecutar_comando(verbo, objeto):
 
         if hab == 4 and objetivo in ["alacena", "la alacena"]:
             if cond[2] == "s":
-                return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Abres la alacena con confianza. Nada logra herirte."
+                # marcar la alacena como abierta
+                cond[4] = "s"
+                return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Una rata salta, te intenta morder, pero gracias a la armadura lo único que consigue es romperse los dientes."
             else:
                 return morir_por_rata()
 
@@ -746,7 +766,7 @@ imagen = tk.Label(
 imagen.foto_actual = foto_actual  # evitar que el recolector de basura elimine la imagen
 if foto_actual is None:
     imagen.config(text="(imagen no encontrada)", fg="white", font=("Verdana", 14))
-imagen.pack(fill=tk.BOTH, expand=True, pady=10)
+imagen.pack(fill=tk.BOTH, expand=True, pady=(20, 10))  # Aumentar el margen superior
 
 # Zona de texto con la narrativa de la sala y mensajes adicionales.
 texto = tk.Label(
@@ -755,9 +775,9 @@ texto = tk.Label(
     fg="white",
     bg="black",
     justify="center",
-    wraplength=600,
-    height=5,
-    font=("Verdana", 20)
+    wraplength=760,
+    height=8,
+    font=("Verdana", 18)
 )
 texto.pack(fill=tk.BOTH, expand=True)
 
@@ -766,7 +786,7 @@ entrada = tk.Entry(
     fg="green",
     bg="black",
     justify="left",
-    font=("Verdana", 20),
+    font=("Verdana", 18),
     textvariable=frase_var,
     insertbackground="green"  # color del cursor
 )
@@ -801,9 +821,10 @@ def manejar_tecla_reinicio(event):
 def refrescar_pantalla(nueva_hab, descripcion_sala, mensaje_extra=None):
     """
     Redibuja imagen y texto.
-    Ignoramos descripcion_sala que viene del motor y recalculamos
-    desde descripcion_con_objetos() para que siempre esté fresco
-    después de coger/dejar objetos.
+    Si hay mensaje_extra (p. ej. resultado de 'examinar'), mostramos la
+    descripción base de la sala (txt_base) y añadimos el mensaje_extra,
+    para evitar duplicados cuando la acción también revela objetos.
+    En caso contrario, usamos la descripción dinámica completa.
     """
     global foto_actual
     # Actualizamos la imagen de acuerdo con la habitación destino.
@@ -814,11 +835,14 @@ def refrescar_pantalla(nueva_hab, descripcion_sala, mensaje_extra=None):
     else:
         imagen.config(image="", text=f"[Imagen {nueva_hab} no disponible]", fg="white", font=("Verdana", 14))
 
-    base = descripcion_con_objetos(nueva_hab)
-
+    # Si hay mensaje_extra preferimos mostrar la descripción base (sin la lista dinámica
+    # de objetos) y añadir el mensaje, para evitar repetir la misma información.
     if mensaje_extra:
+        base = txt_base[nueva_hab]
         texto_completo = base + "\n\n" + mensaje_extra
     else:
+        # comportamiento por defecto: descripción dinámica con objetos
+        base = descripcion_con_objetos(nueva_hab)
         texto_completo = base
 
     # Mostramos la narración final resultante.
