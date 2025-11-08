@@ -62,12 +62,15 @@ img = [
 # Vector de banderas de estado globales.
 # cond[1] controla si puedes ir al sur desde la habitación 1
 # (antes hay que leer el libro).
-# cond[2] indica si llevas la armadura puesta; se usa para
-# resolver encuentros peligrosos en la cocina.
-# Otros huecos se reservan para futuras puertas u obstáculos.
+# cond[2] indica si llevas la armadura puesta y, por tanto, si
+# puedes abrir la alacena sin morir.
+# cond[3] controla si ya has descubierto la armadura oculta en el
+# baúl de la habitación 5.
+# Otros huecos se reservan para futuros obstáculos.
 # "n" = aún no puedes pasar.
 # "s" = el obstáculo ya está desbloqueado.
 cond = ["", 
+        "n",
         "n",
         "n"
 ]
@@ -84,11 +87,36 @@ OBJETOS_INICIALES = {
     6: ["pan", "espada"],
 }
 
+DESCRIPCIONES_OBJETOS = {
+    "libro": {
+        "sala": "Se trata de un libro de caballerías repleto de hazañas.",
+        "inventario": "Es tu preciado libro de caballerías.",
+    },
+    "armadura": {
+        "sala": "Una armadura con señales del paso del tiempo, pero aún resistente.",
+        "inventario": "Notas el peso de la armadura; te hará invulnerable a pequeños ataques.",
+    },
+    "llave": {
+        "sala": "Una llave de hierro forjado cuelga discretamente.",
+        "inventario": "Guardas la llave con cuidado, podría abrir un portal importante.",
+    },
+    "espada": {
+        "sala": "Una espada algo mellada, aunque todavía capaz de luchar.",
+        "inventario": "Sientes la espada cerca, lista para blandirse si hace falta.",
+    },
+    "pan": {
+        "sala": "Ves un currusco de pan, duro pero comestible.",
+        "inventario": "El currusco de pan podría aliviar el hambre durante el viaje.",
+    },
+    "camisa": {
+        "sala": "Una camisa sencilla de lino se mantiene doblada con esmero.",
+        "inventario": "Tu camisa habitual, sencilla y cómoda.",
+    },
+}
 
 def clonar_objetos_iniciales():
     """Devuelve una copia profunda simple del estado inicial de objetos."""
     return {hab: list(objetos) for hab, objetos in OBJETOS_INICIALES.items()}
-
 
 def restablecer_estado_inicial():
     """
@@ -97,13 +125,25 @@ def restablecer_estado_inicial():
     global habitacion_actual, cond, inventario, objetos_en_sala
 
     habitacion_actual = 1  # dormitorio
-    cond = ["", "n", "n"]
+    cond = ["", "n", "n", "n"]
     inventario = ["camisa"]
     objetos_en_sala = clonar_objetos_iniciales()
 
-
 # Inicializamos los valores por primera vez.
 restablecer_estado_inicial()
+
+def objetos_visibles_en_sala(hab):
+    """
+    Devuelve la lista de objetos visibles en una sala determinada,
+    aplicando lógicas de aparición condicional.
+    """
+    visibles = list(objetos_en_sala.get(hab, []))
+
+    if hab == 5 and cond[3] != "s" and "armadura" in visibles:
+        visibles.remove("armadura")
+
+    return visibles
+
 
 # Estado global que indica si el jugador está muerto esperando reinicio.
 estado_muerte = False
@@ -236,6 +276,24 @@ def normaliza_objeto_usuario(texto_objeto):
     return None
 
 
+def descripcion_objeto(nombre, origen):
+    """
+    Devuelve una descripción detallada del objeto según dónde esté.
+    origen puede ser 'sala' o 'inventario'.
+    """
+    info = DESCRIPCIONES_OBJETOS.get(nombre, {})
+
+    if isinstance(info, dict):
+        if origen == "inventario":
+            return info.get("inventario") or info.get("sala") or f"Llevas {nombre_visible_inventario(nombre)} contigo."
+        return info.get("sala") or f"Observas {nombre_visible_inventario(nombre)}."
+
+    # Si info es un string simple, úsalo en ambos contextos.
+    if origen == "inventario":
+        return info or f"Llevas {nombre_visible_inventario(nombre)} contigo."
+    return info or f"Observas {nombre_visible_inventario(nombre)}."
+
+
 def inventario_texto():
     """
     Texto que se ve al hacer INVENTARIO.
@@ -260,7 +318,7 @@ def descripcion_con_objetos(hab):
     """
     base = txt_base[hab]
 
-    objs = objetos_en_sala.get(hab, [])
+    objs = objetos_visibles_en_sala(hab)
 
     if len(objs) == 0:
         return base
@@ -405,22 +463,35 @@ def ejecutar_comando(verbo, objeto):
     # MIRAR / EXAMINAR
     if verbo in ["examinar", "mirar"]:
         if objeto:
+            texto_objeto = objeto.strip().lower()
+
+            if hab == 5:
+                texto_sin_tildes = (
+                    texto_objeto.replace("á", "a")
+                    .replace("é", "e")
+                    .replace("í", "i")
+                    .replace("ó", "o")
+                    .replace("ú", "u")
+                )
+                if "baul" in texto_sin_tildes:
+                    cond[3] = "s"
+                    mensaje = "Entre las muchas anticuallas destaca una armadura."
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
+
             # Caso especial: "mirar libro" en la hab 1, pero ahora el libro es ya objeto real,
             # así que tratamos como cualquier objeto normal usando normalización.
             nombre_normalizado = normaliza_objeto_usuario(objeto)
 
             if nombre_normalizado:
                 # mirar un objeto que está en la sala
-                if nombre_normalizado in objetos_en_sala.get(hab, []):
-                    if nombre_normalizado == "libro":
-                        return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Se trata de un libro de caballerías."
-                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), f"Observas {nombre_visible_inventario(nombre_normalizado)}."
+                if nombre_normalizado in objetos_visibles_en_sala(hab):
+                    mensaje = descripcion_objeto(nombre_normalizado, "sala")
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
 
                 # mirar algo que llevas encima
                 if nombre_normalizado in inventario:
-                    if nombre_normalizado == "libro":
-                        return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Es tu preciado libro de caballerías."
-                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), f"Llevas {nombre_visible_inventario(nombre_normalizado)} contigo."
+                    mensaje = descripcion_objeto(nombre_normalizado, "inventario")
+                    return habitacion_actual, descripcion_con_objetos(habitacion_actual), mensaje
 
             # nada reconocible
             return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No ves nada especial."
@@ -481,6 +552,9 @@ def ejecutar_comando(verbo, objeto):
 
         if nombre_normalizado is None:
             return habitacion_actual, descripcion_con_objetos(habitacion_actual), "No sé qué quieres coger."
+
+        if nombre_normalizado not in objetos_visibles_en_sala(hab):
+            return habitacion_actual, descripcion_con_objetos(habitacion_actual), "Eso no está aquí."
 
         sala_objs = objetos_en_sala.get(hab, [])
 
